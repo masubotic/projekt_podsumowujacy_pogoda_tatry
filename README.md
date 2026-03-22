@@ -68,3 +68,14 @@ uv run jupyter lab
 | `uv remove <pakiet>` | Usunięcie pakietu z projektu |
 | `uv run <komenda>` | Uruchomienie komendy w środowisku projektu |
 | `uv python list` | Lista dostępnych wersji Pythona |
+
+## Struktura katalogow
+
+- `Scripts/` - skrypty automatyzujace (API, import do SQLite, obsluga bazy)
+- `Notebooks/` - notebooki analityczne
+- `data/` - pliki CSV/JSON oraz baza `weather.db`
+
+## Szybkie komendy
+
+- Odswiezenie danych API: `python Scripts/API.py --all`
+- Import CSV do SQLite: `python Scripts/sqlite_import.py --mode replace`
