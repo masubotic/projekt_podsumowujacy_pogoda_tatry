@@ -5,6 +5,7 @@ from pathlib import Path
 
 import folium
 import pandas as pd
+import streamlit as st
 from folium.plugins import HeatMap
 
 
@@ -72,6 +73,7 @@ def _normalize(series: pd.Series) -> pd.Series:
     return (series - min_v) / (max_v - min_v)
 
 
+@st.cache_data(show_spinner=False)
 def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
     center_lat = float(df["lat"].mean())
     center_lon = float(df["lon"].mean())

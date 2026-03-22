@@ -17,6 +17,3 @@ dependencies = [
     "streamlit-folium>=0.25.3",
     "tqdm>=4.67.3",
 ]
-
-[tool.uv.scripts]
-dashboard = "streamlit run Scripts/dashboard.py"

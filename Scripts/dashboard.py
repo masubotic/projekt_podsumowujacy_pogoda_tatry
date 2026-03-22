@@ -20,8 +20,9 @@ tab_history, tab_forecast, tab_export = st.tabs(
     ["Dane historyczne", "Prognoza pogody", "Eksport danych"]
 )
 
-with tab_history:
-    st.caption("Heatmapa parametrow pogodowych i zanieczyszczenia PM10 z pliku weather_history.csv")
+
+@st.fragment
+def history_fragment():
     hist_df = load_weather_history()
     left_col, right_col = st.columns([1.5, 8.5], gap="medium")
     with left_col:
@@ -54,49 +55,59 @@ with tab_history:
             st.warning("Brak danych dla wybranego timestamp.")
         else:
             hist_map = build_heatmap(filtered_hist, selected_param, PARAM_LABELS[selected_param])
-            st_folium(hist_map, width=None, height=700)
+            st_folium(hist_map, width=None, height=630, key="hist_map")
 
-with tab_forecast:
-    st.caption("Heatmapa temperatury na podstawie wybranego czasu pobrania prognozy")
+
+@st.fragment
+def forecast_fragment():
     snapshots = list_forecast_snapshots()
     if not snapshots:
         st.error("Brak plikow prognozy w katalogu data/json.")
-    else:
-        left_col, right_col = st.columns([1.5, 8.5], gap="medium")
-        with left_col:
-            snapshot_times = [item[0] for item in snapshots]
-            selected_snapshot = st.selectbox(
-                "Pobrano",
-                options=snapshot_times,
-                format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
-                index=len(snapshot_times) - 1,
-                key="forecast_snapshot",
-            )
-            selected_snapshot_path = dict(snapshots)[selected_snapshot]
-            forecast_df = load_forecast(selected_snapshot_path)
-            available_times = sorted(forecast_df["forecast_time"].unique())
-            selected_time = st.selectbox(
-                "Czas prognozy",
-                options=available_times,
-                format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
-                index=0,
-                key="forecast_time",
-            )
-            filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
-            if filtered_forecast.empty:
-                st.warning("Brak danych.")
-            else:
-                st.markdown("### Podsumowanie")
-                st.metric("Liczba punktow", len(filtered_forecast))
-                st.metric("Srednia temp.", f"{filtered_forecast['temp'].mean():.2f} C")
-                st.metric("Min temp.", f"{filtered_forecast['temp'].min():.2f} C")
-                st.metric("Max temp.", f"{filtered_forecast['temp'].max():.2f} C")
-        with right_col:
-            if filtered_forecast.empty:
-                st.warning("Brak punktow dla wybranego czasu prognozy.")
-            else:
-                forecast_map = build_heatmap(filtered_forecast, "temp", "Temperatura prognozowana (C)")
-                st_folium(forecast_map, width=None, height=700)
+        return
+    left_col, right_col = st.columns([1.5, 8.5], gap="medium")
+    with left_col:
+        snapshot_times = [item[0] for item in snapshots]
+        selected_snapshot = st.selectbox(
+            "Pobrano",
+            options=snapshot_times,
+            format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
+            index=len(snapshot_times) - 1,
+            key="forecast_snapshot",
+        )
+        selected_snapshot_path = dict(snapshots)[selected_snapshot]
+        forecast_df = load_forecast(selected_snapshot_path)
+        available_times = sorted(forecast_df["forecast_time"].unique())
+        selected_time = st.selectbox(
+            "Czas prognozy",
+            options=available_times,
+            format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
+            index=0,
+            key="forecast_time",
+        )
+        filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
+        if filtered_forecast.empty:
+            st.warning("Brak danych.")
+        else:
+            st.markdown("### Podsumowanie")
+            st.metric("Liczba punktow", len(filtered_forecast))
+            st.metric("Srednia temp.", f"{filtered_forecast['temp'].mean():.2f} C")
+            st.metric("Min temp.", f"{filtered_forecast['temp'].min():.2f} C")
+            st.metric("Max temp.", f"{filtered_forecast['temp'].max():.2f} C")
+    with right_col:
+        if filtered_forecast.empty:
+            st.warning("Brak punktow dla wybranego czasu prognozy.")
+        else:
+            forecast_map = build_heatmap(filtered_forecast, "temp", "Temperatura prognozowana (C)")
+            st_folium(forecast_map, width=None, height=630, key="forecast_map")
+
+
+with tab_history:
+    st.caption("Heatmapa parametrow pogodowych i zanieczyszczenia PM10 z pliku weather_history.csv")
+    history_fragment()
+
+with tab_forecast:
+    st.caption("Heatmapa temperatury na podstawie wybranego czasu pobrania prognozy")
+    forecast_fragment()
 
 with tab_export:
     st.caption("Pobieranie danych zrodlowych do CSV i Excel")
