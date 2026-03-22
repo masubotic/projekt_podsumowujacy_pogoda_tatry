@@ -168,33 +168,34 @@ def ai_risk_fragment():
             box_fn_name, risk_label = _RISK_COLORS.get(rec, ("info", rec))
             box_fn = getattr(st, box_fn_name)
             st.markdown("---")
-            st.caption(f"Dopasowany punkt: {result.matched_description}")
-            st.caption(f"lat={result.matched_lat:.5f}, lon={result.matched_lon:.5f}")
             box_fn(f"**{risk_label}**\n\n{result.justification}")
 
     with right_col:
         all_points = get_all_points_forecast_24h(snapshot_path)
-
         matched_lat = result.matched_lat if result else None
         matched_lon = result.matched_lon if result else None
 
-        ai_map = build_ai_map(all_points, matched_lat, matched_lon)
-        st_folium(ai_map, width=None, height=450, key="ai_map", returned_objects=[])
+        map_col, chart_col = st.columns(2, gap="medium")
 
-        if result is not None:
-            matched_point = next(
-                (p for p in all_points
-                 if abs(p["lat"] - result.matched_lat) < 1e-4
-                 and abs(p["lon"] - result.matched_lon) < 1e-4),
-                None,
-            )
-            if matched_point:
-                st.markdown(f"##### Prognoza 24h — {result.matched_description}")
-                chart_df = pd.DataFrame(
-                    {"Temperatura (°C)": list(matched_point["prognoza_24h"].values())},
-                    index=list(matched_point["prognoza_24h"].keys()),
+        with map_col:
+            ai_map = build_ai_map(all_points, matched_lat, matched_lon)
+            st_folium(ai_map, width=None, height=450, key="ai_map", returned_objects=[])
+
+        with chart_col:
+            if result is not None:
+                matched_point = next(
+                    (p for p in all_points
+                     if abs(p["lat"] - result.matched_lat) < 1e-4
+                     and abs(p["lon"] - result.matched_lon) < 1e-4),
+                    None,
                 )
-                st.line_chart(chart_df, y="Temperatura (°C)")
+                if matched_point:
+                    st.markdown(f"##### Prognoza 24h — {result.matched_description}")
+                    chart_df = pd.DataFrame(
+                        {"Temperatura (°C)": list(matched_point["prognoza_24h"].values())},
+                        index=list(matched_point["prognoza_24h"].keys()),
+                    )
+                    st.line_chart(chart_df, y="Temperatura (°C)")
 
 
 with tab_history:

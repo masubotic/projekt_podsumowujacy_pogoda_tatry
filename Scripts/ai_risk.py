@@ -34,6 +34,11 @@ Kontekst geograficzny siatki punktów (lat/lon):
 - Niższe partie / doliny (wyższe lat ~49.25–49.31): podtatrzańskie doliny po stronie polskiej
 
 Zwróć współrzędne matched_lat i matched_lon dokładnie takie, jakie widnieją na liście punktów.
+
+Zasady dotyczące pola justification:
+- Pisz wyłącznie o warunkach pogodowych i ryzyku wędrówki — jakby użytkownik zapytał o pogodę w tym miejscu.
+- NIE wspominaj o współrzędnych, wartościach lat/lon, punktach siatki ani procesie ich doboru.
+- NIE wyjaśniaj, skąd wziąłeś dane ani jak dobrałeś punkt — po prostu oceń warunki i ryzyko.
 """.strip()
 
 
