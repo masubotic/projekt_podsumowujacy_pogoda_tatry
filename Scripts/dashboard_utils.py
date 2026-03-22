@@ -62,8 +62,14 @@ def get_all_points_forecast_24h(path: Path) -> list[dict]:
     ]
 
 
-def build_ai_map(all_points: list[dict], matched_lat: float | None = None, matched_lon: float | None = None) -> folium.Map:
-    """Buduje mapę ze wszystkimi punktami siatki i opcjonalnym wyróżnieniem dopasowanego punktu."""
+def build_ai_map(
+    all_points: list[dict],
+    matched_points: list[tuple[float, float, str]] | None = None,
+) -> folium.Map:
+    """
+    Buduje mapę ze wszystkimi punktami siatki.
+    matched_points: lista krotek (lat, lon, description) dopasowanych punktów/trasy.
+    """
     lats = [p["lat"] for p in all_points]
     lons = [p["lon"] for p in all_points]
     fmap = folium.Map(
@@ -71,28 +77,41 @@ def build_ai_map(all_points: list[dict], matched_lat: float | None = None, match
         zoom_start=10,
         tiles="CartoDB positron",
     )
+
+    matched_set = {
+        (round(lat, 4), round(lon, 4))
+        for lat, lon, _ in (matched_points or [])
+    }
+
     for p in all_points:
-        is_match = (
-            matched_lat is not None
-            and abs(p["lat"] - matched_lat) < 1e-4
-            and abs(p["lon"] - matched_lon) < 1e-4
-        )
-        if is_match:
+        if (round(p["lat"], 4), round(p["lon"], 4)) in matched_set:
+            continue  # matched points rendered separately below
+        folium.CircleMarker(
+            location=[p["lat"], p["lon"]],
+            radius=4,
+            color="#1f2937",
+            weight=1,
+            fill=True,
+            fill_color="#6b7280",
+            fill_opacity=0.5,
+        ).add_to(fmap)
+
+    if matched_points:
+        coords = [(lat, lon) for lat, lon, _ in matched_points]
+
+        # Linia trasy gdy więcej niż jeden punkt
+        if len(coords) > 1:
+            folium.PolyLine(coords, color="#dc2626", weight=3, opacity=0.8).add_to(fmap)
+
+        for i, (lat, lon, desc) in enumerate(matched_points):
+            label = f"Start: {desc}" if i == 0 and len(matched_points) > 1 else \
+                    f"Meta: {desc}" if i == len(matched_points) - 1 and len(matched_points) > 1 else desc
             folium.Marker(
-                location=[p["lat"], p["lon"]],
+                location=[lat, lon],
                 icon=folium.Icon(color="red", icon="star"),
-                popup=f"Dopasowany punkt\nlat={p['lat']:.5f}, lon={p['lon']:.5f}",
+                popup=label,
             ).add_to(fmap)
-        else:
-            folium.CircleMarker(
-                location=[p["lat"], p["lon"]],
-                radius=4,
-                color="#1f2937",
-                weight=1,
-                fill=True,
-                fill_color="#6b7280",
-                fill_opacity=0.5,
-            ).add_to(fmap)
+
     return fmap
 
 

@@ -14,7 +14,7 @@ from dashboard_utils import (
     load_forecast,
     load_weather_history,
 )
-from ai_risk import RiskAssessment, assess_risk
+from ai_risk import MatchedPoint, RiskAssessment, assess_risk
 
 
 st.set_page_config(page_title="Dashboard pogodowy Tatry", page_icon="", layout="wide")
@@ -168,40 +168,53 @@ def ai_risk_fragment():
 
     with right_col:
         if result is not None:
-            rec = result.recommendation.lower()
-            box_fn_name, risk_label = _RISK_COLORS.get(rec, ("info", rec))
-            getattr(st, box_fn_name)(f"**{risk_label}**\n\n{result.justification}")
+            if not result.in_tatry:
+                st.info("Dashboard obsługuje wyłącznie obszar Tatr. Podana lokalizacja znajduje się poza zasięgiem danych.")
+            else:
+                rec = result.recommendation.lower()
+                box_fn_name, risk_label = _RISK_COLORS.get(rec, ("info", rec))
+                getattr(st, box_fn_name)(f"**{risk_label}**\n\n{result.justification}")
 
-        matched_lat = result.matched_lat if result else None
-        matched_lon = result.matched_lon if result else None
+        matched_coords = (
+            [(mp.lat, mp.lon, mp.description) for mp in result.matched_points]
+            if (result and result.in_tatry and result.matched_points)
+            else None
+        )
 
         map_col, chart_col = st.columns(2, gap="medium")
 
         with map_col:
-            ai_map = build_ai_map(all_points, matched_lat, matched_lon)
+            ai_map = build_ai_map(all_points, matched_coords)
             st_folium(ai_map, width=None, height=420, key="ai_map", returned_objects=[])
 
         with chart_col:
-            if result is not None:
-                matched_point = next(
-                    (p for p in all_points
-                     if abs(p["lat"] - result.matched_lat) < 1e-4
-                     and abs(p["lon"] - result.matched_lon) < 1e-4),
-                    None,
-                )
-                if matched_point:
-                    st.markdown(f"##### Prognoza 24h — {result.matched_description}")
-                    times = list(matched_point["prognoza_24h"].keys())
-                    temps = list(matched_point["prognoza_24h"].values())
-                    tick_labels = [t[:16] for t in times]  # usuwa sekundy
-                    fig = go.Figure(go.Scatter(
-                        x=tick_labels, y=temps, mode="lines+markers",
-                        line=dict(color="#2563eb"), marker=dict(size=6),
-                    ))
+            if result is not None and result.in_tatry and result.matched_points:
+                fig = go.Figure()
+                for mp in result.matched_points:
+                    point_data = next(
+                        (p for p in all_points
+                         if abs(p["lat"] - mp.lat) < 1e-4
+                         and abs(p["lon"] - mp.lon) < 1e-4),
+                        None,
+                    )
+                    if point_data:
+                        tick_labels = [t[:16] for t in point_data["prognoza_24h"].keys()]
+                        temps = list(point_data["prognoza_24h"].values())
+                        fig.add_trace(go.Scatter(
+                            x=tick_labels, y=temps,
+                            mode="lines+markers",
+                            name=mp.description,
+                            marker=dict(size=5),
+                        ))
+                if fig.data:
+                    title = "Prognoza 24h — trasa" if len(result.matched_points) > 1 else \
+                            f"Prognoza 24h — {result.matched_points[0].description}"
+                    st.markdown(f"##### {title}")
                     fig.update_layout(
                         xaxis=dict(tickangle=45),
                         yaxis_title="Temperatura (°C)",
-                        margin=dict(t=10, b=10, l=10, r=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        margin=dict(t=40, b=10, l=10, r=10),
                         height=380,
                     )
                     st.plotly_chart(fig, use_container_width=True)
