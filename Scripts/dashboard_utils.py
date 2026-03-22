@@ -169,15 +169,13 @@ def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
             popup=f"{title}: {row[value_col]:.2f}",
         ).add_to(fmap)
 
-    # Leaflet nie zna swoich wymiarów gdy inicjalizuje się w ukrytym tabie (display:none).
-    # Sprawdzamy getSize().x === 0 — to pewny wskaźnik że mapa nie zna wymiarów.
-    # Wywołujemy invalidateSize() co 500ms dopóki mapa nie zna wymiarów lub minie 10s.
+    # Leaflet nie zna wymiarów gdy inicjalizuje się w ukrytym tabie Streamlita.
+    # IntersectionObserver reaguje natychmiast gdy kontener wchodzi do viewportu (tab staje się widoczny).
+    # Fallback polling co 1s bez limitu czasu — obsługuje powrót na tab po dowolnie długim czasie.
     fmap.get_root().html.add_child(Element("""
     <script>
     (function () {
-        var ticks = 0;
-        var interval = setInterval(function () {
-            ticks++;
+        function fixMaps() {
             document.querySelectorAll('.leaflet-container').forEach(function (el) {
                 if (el._leaflet_map) {
                     var sz = el._leaflet_map.getSize();
@@ -186,8 +184,21 @@ def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
                     }
                 }
             });
-            if (ticks >= 20) clearInterval(interval);
-        }, 500);
+        }
+
+        // Event-driven: odpala dokładnie gdy mapa wchodzi do viewportu
+        function attachObserver() {
+            var containers = document.querySelectorAll('.leaflet-container');
+            if (containers.length === 0) { setTimeout(attachObserver, 100); return; }
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) { if (e.isIntersecting) fixMaps(); });
+            }, { threshold: 0.01 });
+            containers.forEach(function (el) { io.observe(el); });
+        }
+        if (window.IntersectionObserver) attachObserver();
+
+        // Fallback polling bez limitu czasu — obsługuje powrót po długiej nieobecności
+        setInterval(fixMaps, 1000);
     })();
     </script>
     """))
