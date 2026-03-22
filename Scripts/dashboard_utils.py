@@ -11,6 +11,7 @@ from folium.plugins import HeatMap
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
 WEATHER_HISTORY_CSV = DATA_DIR / "weather_history.csv"
+HISTORICAL_CSV = DATA_DIR / "historical_for_eda.csv"
 JSON_DIR = DATA_DIR / "json"
 
 
