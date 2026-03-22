@@ -90,9 +90,10 @@ def refresh_historical(start: str, end: str, rapidapi_key: str) -> Path:
     return HISTORICAL_CSV
 
 
-def refresh_current_weather(openweather_key: str, grid_size: int, append: bool) -> Path:
+def refresh_current_weather(
+    openweather_key: str, grid_size: int, append: bool, run_timestamp: str
+) -> Path:
     rows: list[dict] = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     for lat, lon in tqdm(_lat_lon_grid(grid_size), desc="OpenWeather current"):
         weather_response = requests.get(
@@ -119,7 +120,7 @@ def refresh_current_weather(openweather_key: str, grid_size: int, append: bool) 
             "lat": lat,
             "lon": lon,
             "pm10": pm10,
-            "download_timestamp": timestamp,
+            "download_timestamp": run_timestamp,
         }
         rows.append(row)
 
@@ -137,7 +138,7 @@ def refresh_current_weather(openweather_key: str, grid_size: int, append: bool) 
     return WEATHER_HISTORY_CSV
 
 
-def refresh_forecast(openweather_key: str, grid_size: int) -> Path:
+def refresh_forecast(openweather_key: str, grid_size: int, run_timestamp: str) -> Path:
     forecast_data: list[dict] = []
     for lat, lon in tqdm(_lat_lon_grid(grid_size), desc="OpenWeather forecast"):
         response = requests.get(
@@ -151,7 +152,7 @@ def refresh_forecast(openweather_key: str, grid_size: int) -> Path:
         forecast_data.append({"lat": lat, "lon": lon, "temperatures": temperatures})
 
     JSON_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = JSON_DIR / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    file_path = JSON_DIR / f"{run_timestamp}.json"
     with file_path.open("w", encoding="utf-8") as handle:
         json.dump(forecast_data, handle, indent=2)
     return file_path
@@ -184,6 +185,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     load_dotenv()
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     run_historical = args.all or args.historical
     run_current = args.all or args.current
@@ -205,12 +207,17 @@ def main() -> None:
             openweather_key=openweather_key,
             grid_size=args.grid_size,
             append=args.weather_mode == "append",
+            run_timestamp=run_timestamp,
         )
         outputs.append(f"current: {path}")
 
     if run_forecast:
         openweather_key = _required_env("OPENWEATHERAPI_KEY")
-        path = refresh_forecast(openweather_key=openweather_key, grid_size=args.grid_size)
+        path = refresh_forecast(
+            openweather_key=openweather_key,
+            grid_size=args.grid_size,
+            run_timestamp=run_timestamp,
+        )
         outputs.append(f"forecast: {path}")
 
     print("Zakonczono odswiezanie:")

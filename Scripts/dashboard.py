@@ -26,11 +26,11 @@ with tab_history:
     left_col, right_col = st.columns([1.5, 8.5], gap="medium")
     with left_col:
         timestamps = sorted(hist_df["download_timestamp"].dropna().unique())
-        selected_timestamp = st.selectbox(
+        selected_timestamp = st.select_slider(
             "Czas danych",
             options=timestamps,
             format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
-            index=len(timestamps) - 1,
+            value=timestamps[-1],
             key="history_timestamp",
         )
         selected_param = st.selectbox(
