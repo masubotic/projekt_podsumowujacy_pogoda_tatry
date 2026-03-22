@@ -49,13 +49,51 @@ def list_forecast_snapshots() -> list[tuple[pd.Timestamp, Path]]:
 
 
 @st.cache_data(show_spinner=False)
-def get_point_forecast_24h(path: Path, lat: float, lon: float) -> dict:
-    """Zwraca pierwsze 8 odczytów temperatury (24h co 3h) dla wskazanego punktu."""
+def get_all_points_forecast_24h(path: Path) -> list[dict]:
+    """Zwraca pierwsze 8 odczytów temperatury (24h co 3h) dla wszystkich punktów siatki."""
     raw = json.loads(path.read_text(encoding="utf-8"))
-    for point in raw:
-        if abs(point["lat"] - lat) < 1e-6 and abs(point["lon"] - lon) < 1e-6:
-            return dict(list(point["temperatures"].items())[:8])
-    return {}
+    return [
+        {
+            "lat": round(point["lat"], 5),
+            "lon": round(point["lon"], 5),
+            "prognoza_24h": dict(list(point["temperatures"].items())[:8]),
+        }
+        for point in raw
+    ]
+
+
+def build_ai_map(all_points: list[dict], matched_lat: float | None = None, matched_lon: float | None = None) -> folium.Map:
+    """Buduje mapę ze wszystkimi punktami siatki i opcjonalnym wyróżnieniem dopasowanego punktu."""
+    lats = [p["lat"] for p in all_points]
+    lons = [p["lon"] for p in all_points]
+    fmap = folium.Map(
+        location=[sum(lats) / len(lats), sum(lons) / len(lons)],
+        zoom_start=10,
+        tiles="CartoDB positron",
+    )
+    for p in all_points:
+        is_match = (
+            matched_lat is not None
+            and abs(p["lat"] - matched_lat) < 1e-4
+            and abs(p["lon"] - matched_lon) < 1e-4
+        )
+        if is_match:
+            folium.Marker(
+                location=[p["lat"], p["lon"]],
+                icon=folium.Icon(color="red", icon="star"),
+                popup=f"Dopasowany punkt\nlat={p['lat']:.5f}, lon={p['lon']:.5f}",
+            ).add_to(fmap)
+        else:
+            folium.CircleMarker(
+                location=[p["lat"], p["lon"]],
+                radius=4,
+                color="#1f2937",
+                weight=1,
+                fill=True,
+                fill_color="#6b7280",
+                fill_opacity=0.5,
+            ).add_to(fmap)
+    return fmap
 
 
 @st.cache_data(show_spinner=False)

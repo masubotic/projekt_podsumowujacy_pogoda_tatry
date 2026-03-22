@@ -6,8 +6,9 @@ import pandas as pd
 from dashboard_utils import (
     HISTORICAL_CSV,
     PARAM_LABELS,
+    build_ai_map,
     build_heatmap,
-    get_point_forecast_24h,
+    get_all_points_forecast_24h,
     list_forecast_snapshots,
     load_forecast,
     load_weather_history,
@@ -134,72 +135,66 @@ def ai_risk_fragment():
     if st.session_state.get("ai_snapshot") not in snapshot_labels:
         st.session_state["ai_snapshot"] = snapshot_labels[-1]
 
-    left_col, right_col = st.columns([2, 8], gap="medium")
+    left_col, right_col = st.columns([2.5, 7.5], gap="medium")
+    result: RiskAssessment | None = st.session_state.get("ai_result")
 
     with left_col:
-        selected_label = st.selectbox(
-            "Pobrano",
-            options=snapshot_labels,
-            key="ai_snapshot",
-        )
+        selected_label = st.selectbox("Pobrano", options=snapshot_labels, key="ai_snapshot")
         snapshot_path = snapshot_path_map[selected_label]
-        forecast_df = load_forecast(snapshot_path)
 
-        points = (
-            forecast_df[["lat", "lon"]]
-            .drop_duplicates()
-            .sort_values(["lat", "lon"])
-            .reset_index(drop=True)
+        st.markdown("##### Opisz lokalizację")
+        user_description = st.text_area(
+            label="Lokalizacja",
+            placeholder="np. okolice Kasprowego Wierchu, Morskie Oko, Dolina Kościeliska...",
+            height=100,
+            label_visibility="collapsed",
+            key="ai_description",
         )
-        point_labels = [f"lat={r.lat:.5f}, lon={r.lon:.5f}" for r in points.itertuples()]
-        point_coords = {label: (r.lat, r.lon) for label, r in zip(point_labels, points.itertuples())}
 
-        if st.session_state.get("ai_point") not in point_labels:
-            st.session_state["ai_point"] = point_labels[len(point_labels) // 2]
-
-        selected_point = st.selectbox("Punkt", options=point_labels, key="ai_point")
-        lat, lon = point_coords[selected_point]
-
-        forecast_24h = get_point_forecast_24h(snapshot_path, lat, lon)
-
-        if st.button("Oceń ryzyko", type="primary", use_container_width=True):
+        if st.button("Oceń ryzyko", type="primary", use_container_width=True, disabled=not user_description):
             with st.spinner("Odpytuję AI..."):
                 try:
-                    result: RiskAssessment = assess_risk(forecast_24h)
+                    all_points = get_all_points_forecast_24h(snapshot_path)
+                    result = assess_risk(all_points, user_description)
                     st.session_state["ai_result"] = result
-                    st.session_state["ai_result_point"] = selected_point
+                    st.session_state["ai_result_snapshot"] = selected_label
                 except Exception as e:
                     st.session_state["ai_result"] = None
-                    st.session_state["ai_result_point"] = None
                     st.error(f"Błąd API: {e}")
 
         result = st.session_state.get("ai_result")
-        result_point = st.session_state.get("ai_result_point")
         if result is not None:
             rec = result.recommendation.lower()
-            box_fn_name, label = _RISK_COLORS.get(rec, ("info", rec))
+            box_fn_name, risk_label = _RISK_COLORS.get(rec, ("info", rec))
             box_fn = getattr(st, box_fn_name)
             st.markdown("---")
-            st.caption(f"Wynik dla: {result_point}")
-            box_fn(f"**{label}**\n\n{result.justification}")
+            st.caption(f"Dopasowany punkt: {result.matched_description}")
+            st.caption(f"lat={result.matched_lat:.5f}, lon={result.matched_lon:.5f}")
+            box_fn(f"**{risk_label}**\n\n{result.justification}")
 
     with right_col:
-        st.markdown("##### Prognoza 24h dla wybranego punktu")
-        if forecast_24h:
-            chart_df = pd.DataFrame(
-                {"Temperatura (°C)": list(forecast_24h.values())},
-                index=list(forecast_24h.keys()),
-            )
-            st.line_chart(chart_df, y="Temperatura (°C)")
-        else:
-            st.warning("Brak danych dla wybranego punktu.")
+        all_points = get_all_points_forecast_24h(snapshot_path)
 
-        st.markdown("##### Heatmapa temperatury (pierwszy czas prognozy)")
-        first_time = sorted(forecast_df["forecast_time"].unique())[0]
-        slice_df = forecast_df[forecast_df["forecast_time"] == first_time].copy()
-        if not slice_df.empty:
-            ai_map = build_heatmap(slice_df, "temp", "Temperatura prognozowana (C)")
-            st_folium(ai_map, width=None, height=420, key="ai_map", returned_objects=[])
+        matched_lat = result.matched_lat if result else None
+        matched_lon = result.matched_lon if result else None
+
+        ai_map = build_ai_map(all_points, matched_lat, matched_lon)
+        st_folium(ai_map, width=None, height=450, key="ai_map", returned_objects=[])
+
+        if result is not None:
+            matched_point = next(
+                (p for p in all_points
+                 if abs(p["lat"] - result.matched_lat) < 1e-4
+                 and abs(p["lon"] - result.matched_lon) < 1e-4),
+                None,
+            )
+            if matched_point:
+                st.markdown(f"##### Prognoza 24h — {result.matched_description}")
+                chart_df = pd.DataFrame(
+                    {"Temperatura (°C)": list(matched_point["prognoza_24h"].values())},
+                    index=list(matched_point["prognoza_24h"].keys()),
+                )
+                st.line_chart(chart_df, y="Temperatura (°C)")
 
 
 with tab_history:
