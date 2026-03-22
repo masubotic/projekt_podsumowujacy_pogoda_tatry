@@ -1,12 +1,15 @@
+import base64
 import streamlit as st
 from streamlit_folium import st_folium
 from io import BytesIO
+from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
 from dashboard_utils import (
     HISTORICAL_CSV,
     PARAM_LABELS,
+    PROJECT_ROOT,
     build_ai_map,
     build_heatmap,
     get_all_points_forecast_24h,
@@ -19,7 +22,14 @@ from ai_risk import MatchedPoint, RiskAssessment, assess_risk
 
 st.set_page_config(page_title="Dashboard pogodowy Tatry", page_icon="", layout="wide")
 
-st.title("Dashboard pogodowy Tatry")
+_logo_b64 = base64.b64encode((PROJECT_ROOT / "grafika.png").read_bytes()).decode()
+st.markdown(
+    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:24px">'
+    f'<img src="data:image/png;base64,{_logo_b64}" style="width:132px;height:auto">'
+    f'<h1 style="margin:0;padding:0">Dashboard pogodowy Tatry</h1>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 tab_ai, tab_history, tab_forecast, tab_export = st.tabs(
     ["Ocena ryzyka AI", "Dane historyczne", "Prognoza pogody", "Eksport danych"]
 )
