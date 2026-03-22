@@ -134,7 +134,7 @@ with tab_export:
         base_name = f"forecast_export_{selected_snapshot.strftime('%Y%m%d_%H%M%S')}"
 
     st.write(f"Liczba rekordow: {len(export_df)}")
-    st.dataframe(export_df.head(20), use_container_width=True)
+    st.dataframe(export_df.head(20), width="stretch")
 
     csv_bytes = export_df.to_csv(index=False).encode("utf-8")
     st.download_button(
