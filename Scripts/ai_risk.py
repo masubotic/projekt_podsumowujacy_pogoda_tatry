@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 
+import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -86,9 +87,9 @@ def assess_risk(all_points: list[dict], user_description: str) -> RiskAssessment
     Returns:
         RiskAssessment z listą dopasowanych punktów i oceną ryzyka.
     """
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise ValueError("Brak klucza OPENROUTER_API_KEY w pliku .env")
+        raise ValueError("Brak klucza OPENROUTER_API_KEY w pliku .env lub Streamlit Secrets")
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
