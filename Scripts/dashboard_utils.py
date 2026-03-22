@@ -49,6 +49,16 @@ def list_forecast_snapshots() -> list[tuple[pd.Timestamp, Path]]:
 
 
 @st.cache_data(show_spinner=False)
+def get_point_forecast_24h(path: Path, lat: float, lon: float) -> dict:
+    """Zwraca pierwsze 8 odczytów temperatury (24h co 3h) dla wskazanego punktu."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    for point in raw:
+        if abs(point["lat"] - lat) < 1e-6 and abs(point["lon"] - lon) < 1e-6:
+            return dict(list(point["temperatures"].items())[:8])
+    return {}
+
+
+@st.cache_data(show_spinner=False)
 def load_forecast(path: Path) -> pd.DataFrame:
     raw = json.loads(path.read_text(encoding="utf-8"))
     rows: list[dict] = []

@@ -7,17 +7,19 @@ from dashboard_utils import (
     HISTORICAL_CSV,
     PARAM_LABELS,
     build_heatmap,
+    get_point_forecast_24h,
     list_forecast_snapshots,
     load_forecast,
     load_weather_history,
 )
+from ai_risk import RiskAssessment, assess_risk
 
 
 st.set_page_config(page_title="Dashboard pogodowy Tatry", page_icon="", layout="wide")
 
 st.title("Dashboard pogodowy Tatry")
-tab_history, tab_forecast, tab_export = st.tabs(
-    ["Dane historyczne", "Prognoza pogody", "Eksport danych"]
+tab_history, tab_forecast, tab_ai, tab_export = st.tabs(
+    ["Dane historyczne", "Prognoza pogody", "Ocena ryzyka AI", "Eksport danych"]
 )
 
 
@@ -112,6 +114,94 @@ def forecast_fragment():
             st_folium(forecast_map, width=None, height=630, key="forecast_map", returned_objects=[])
 
 
+_RISK_COLORS = {
+    "safe": ("success", "Bezpieczna"),
+    "risky": ("warning", "Ryzykowna"),
+    "dangerous": ("error", "Niebezpieczna"),
+}
+
+
+@st.fragment
+def ai_risk_fragment():
+    snapshots = list_forecast_snapshots()
+    if not snapshots:
+        st.error("Brak plikow prognozy w katalogu data/json.")
+        return
+
+    snapshot_labels = [t.strftime("%Y-%m-%d %H:%M:%S") for t, _ in snapshots]
+    snapshot_path_map = {label: path for label, (_, path) in zip(snapshot_labels, snapshots)}
+
+    if st.session_state.get("ai_snapshot") not in snapshot_labels:
+        st.session_state["ai_snapshot"] = snapshot_labels[-1]
+
+    left_col, right_col = st.columns([2, 8], gap="medium")
+
+    with left_col:
+        selected_label = st.selectbox(
+            "Pobrano",
+            options=snapshot_labels,
+            key="ai_snapshot",
+        )
+        snapshot_path = snapshot_path_map[selected_label]
+        forecast_df = load_forecast(snapshot_path)
+
+        points = (
+            forecast_df[["lat", "lon"]]
+            .drop_duplicates()
+            .sort_values(["lat", "lon"])
+            .reset_index(drop=True)
+        )
+        point_labels = [f"lat={r.lat:.5f}, lon={r.lon:.5f}" for r in points.itertuples()]
+        point_coords = {label: (r.lat, r.lon) for label, r in zip(point_labels, points.itertuples())}
+
+        if st.session_state.get("ai_point") not in point_labels:
+            st.session_state["ai_point"] = point_labels[len(point_labels) // 2]
+
+        selected_point = st.selectbox("Punkt", options=point_labels, key="ai_point")
+        lat, lon = point_coords[selected_point]
+
+        forecast_24h = get_point_forecast_24h(snapshot_path, lat, lon)
+
+        if st.button("Oceń ryzyko", type="primary", use_container_width=True):
+            with st.spinner("Odpytuję AI..."):
+                try:
+                    result: RiskAssessment = assess_risk(forecast_24h)
+                    st.session_state["ai_result"] = result
+                    st.session_state["ai_result_point"] = selected_point
+                except Exception as e:
+                    st.session_state["ai_result"] = None
+                    st.session_state["ai_result_point"] = None
+                    st.error(f"Błąd API: {e}")
+
+        result = st.session_state.get("ai_result")
+        result_point = st.session_state.get("ai_result_point")
+        if result is not None:
+            rec = result.recommendation.lower()
+            box_fn_name, label = _RISK_COLORS.get(rec, ("info", rec))
+            box_fn = getattr(st, box_fn_name)
+            st.markdown("---")
+            st.caption(f"Wynik dla: {result_point}")
+            box_fn(f"**{label}**\n\n{result.justification}")
+
+    with right_col:
+        st.markdown("##### Prognoza 24h dla wybranego punktu")
+        if forecast_24h:
+            chart_df = pd.DataFrame(
+                {"Temperatura (°C)": list(forecast_24h.values())},
+                index=list(forecast_24h.keys()),
+            )
+            st.line_chart(chart_df, y="Temperatura (°C)")
+        else:
+            st.warning("Brak danych dla wybranego punktu.")
+
+        st.markdown("##### Heatmapa temperatury (pierwszy czas prognozy)")
+        first_time = sorted(forecast_df["forecast_time"].unique())[0]
+        slice_df = forecast_df[forecast_df["forecast_time"] == first_time].copy()
+        if not slice_df.empty:
+            ai_map = build_heatmap(slice_df, "temp", "Temperatura prognozowana (C)")
+            st_folium(ai_map, width=None, height=420, key="ai_map", returned_objects=[])
+
+
 with tab_history:
     st.caption("Heatmapa parametrow pogodowych i zanieczyszczenia PM10 z pliku weather_history.csv")
     history_fragment()
@@ -119,6 +209,10 @@ with tab_history:
 with tab_forecast:
     st.caption("Heatmapa temperatury na podstawie wybranego czasu pobrania prognozy")
     forecast_fragment()
+
+with tab_ai:
+    st.caption("Ocena ryzyka wędrówki górskiej na podstawie prognozy 24h — model Claude")
+    ai_risk_fragment()
 
 with tab_export:
     st.caption("Pobieranie danych zrodlowych do CSV i Excel")
