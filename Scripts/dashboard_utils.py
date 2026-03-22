@@ -169,36 +169,40 @@ def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
             popup=f"{title}: {row[value_col]:.2f}",
         ).add_to(fmap)
 
-    # Leaflet nie zna wymiarów gdy inicjalizuje się w ukrytym tabie Streamlita.
-    # IntersectionObserver reaguje natychmiast gdy kontener wchodzi do viewportu (tab staje się widoczny).
-    # Fallback polling co 1s bez limitu czasu — obsługuje powrót na tab po dowolnie długim czasie.
+    # Leaflet buforuje wymiary kontenera — po ukryciu taba getSize() wciąż zwraca 0,
+    # nawet gdy kontener jest już widoczny. Śledzimy clientWidth/clientHeight (rzeczywisty DOM)
+    # i wywołujemy invalidateSize() tylko gdy rozmiar faktycznie się zmienia (0→N lub resize).
     fmap.get_root().html.add_child(Element("""
     <script>
     (function () {
-        function fixMaps() {
-            document.querySelectorAll('.leaflet-container').forEach(function (el) {
-                if (el._leaflet_map) {
-                    var sz = el._leaflet_map.getSize();
-                    if (sz.x === 0 || sz.y === 0) {
-                        el._leaflet_map.invalidateSize(true);
-                    }
-                }
-            });
+        var prevSizes = new WeakMap();
+
+        function fixMap(el) {
+            if (!el._leaflet_map) return;
+            var w = el.clientWidth;
+            var h = el.clientHeight;
+            var prev = prevSizes.get(el);
+            var changed = !prev || prev.w !== w || prev.h !== h;
+            prevSizes.set(el, {w: w, h: h});
+            if (changed && w > 0 && h > 0) {
+                el._leaflet_map.invalidateSize({animate: false, pan: false});
+            }
         }
 
-        // Event-driven: odpala dokładnie gdy mapa wchodzi do viewportu
-        function attachObserver() {
-            var containers = document.querySelectorAll('.leaflet-container');
-            if (containers.length === 0) { setTimeout(attachObserver, 100); return; }
-            var io = new IntersectionObserver(function (entries) {
-                entries.forEach(function (e) { if (e.isIntersecting) fixMaps(); });
-            }, { threshold: 0.01 });
-            containers.forEach(function (el) { io.observe(el); });
+        function fixAll() {
+            document.querySelectorAll('.leaflet-container').forEach(fixMap);
         }
-        if (window.IntersectionObserver) attachObserver();
 
-        // Fallback polling bez limitu czasu — obsługuje powrót po długiej nieobecności
-        setInterval(fixMaps, 1000);
+        // Szybki polling dopóki kontenery Leafleta się nie pojawią
+        var initId = setInterval(function () {
+            if (document.querySelector('.leaflet-container')) {
+                clearInterval(initId);
+                fixAll();
+            }
+        }, 50);
+
+        // Stały polling do wykrywania przejść hidden→visible przy zmianie taba
+        setInterval(fixAll, 500);
     })();
     </script>
     """))

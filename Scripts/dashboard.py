@@ -40,24 +40,25 @@ def history_fragment():
         )
         selected_param = st.selectbox(
             "Parametr",
-            options=list(PARAM_LABELS.keys()),
-            format_func=lambda p: PARAM_LABELS[p],
+            options=[None] + list(PARAM_LABELS.keys()),
+            format_func=lambda p: "Wybierz parametr..." if p is None else PARAM_LABELS[p],
             key="history_param",
         )
 
-        filtered_hist = hist_df[hist_df["download_timestamp"] == selected_timestamp].copy()
-        if filtered_hist.empty:
-            st.warning("Brak danych.")
-        else:
-            st.markdown("### Podsumowanie")
-            st.metric("Liczba punktow", len(filtered_hist))
-            st.metric("Srednia", f"{filtered_hist[selected_param].mean():.2f}")
-            st.metric("Min", f"{filtered_hist[selected_param].min():.2f}")
-            st.metric("Max", f"{filtered_hist[selected_param].max():.2f}")
+        filtered_hist = None
+        if selected_param is not None:
+            filtered_hist = hist_df[hist_df["download_timestamp"] == selected_timestamp].copy()
+            if filtered_hist.empty:
+                st.warning("Brak danych.")
+                filtered_hist = None
+            else:
+                st.markdown("### Podsumowanie")
+                st.metric("Liczba punktow", len(filtered_hist))
+                st.metric("Srednia", f"{filtered_hist[selected_param].mean():.2f}")
+                st.metric("Min", f"{filtered_hist[selected_param].min():.2f}")
+                st.metric("Max", f"{filtered_hist[selected_param].max():.2f}")
     with right_col:
-        if filtered_hist.empty:
-            st.warning("Brak danych dla wybranego timestamp.")
-        else:
+        if filtered_hist is not None:
             hist_map = build_heatmap(filtered_hist, selected_param, PARAM_LABELS[selected_param])
             st_folium(hist_map, width=None, height=630, key="hist_map", returned_objects=[])
 
@@ -91,27 +92,31 @@ def forecast_fragment():
         time_labels = [t.strftime("%Y-%m-%d %H:%M:%S") for t in available_times]
         time_map = {label: t for label, t in zip(time_labels, available_times)}
 
-        if st.session_state.get("forecast_time") not in time_labels:
-            st.session_state["forecast_time"] = time_labels[0]
+        time_labels_with_none = [None] + time_labels
+        if st.session_state.get("forecast_time") not in time_labels_with_none:
+            st.session_state["forecast_time"] = None
         selected_time_label = st.selectbox(
             "Czas prognozy",
-            options=time_labels,
+            options=time_labels_with_none,
+            format_func=lambda x: "Wybierz czas prognozy..." if x is None else x,
             key="forecast_time",
         )
-        selected_time = time_map[selected_time_label]
-        filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
-        if filtered_forecast.empty:
-            st.warning("Brak danych.")
-        else:
-            st.markdown("### Podsumowanie")
-            st.metric("Liczba punktow", len(filtered_forecast))
-            st.metric("Srednia temp.", f"{filtered_forecast['temp'].mean():.2f} C")
-            st.metric("Min temp.", f"{filtered_forecast['temp'].min():.2f} C")
-            st.metric("Max temp.", f"{filtered_forecast['temp'].max():.2f} C")
+
+        filtered_forecast = None
+        if selected_time_label is not None:
+            selected_time = time_map[selected_time_label]
+            filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
+            if filtered_forecast.empty:
+                st.warning("Brak danych.")
+                filtered_forecast = None
+            else:
+                st.markdown("### Podsumowanie")
+                st.metric("Liczba punktow", len(filtered_forecast))
+                st.metric("Srednia temp.", f"{filtered_forecast['temp'].mean():.2f} C")
+                st.metric("Min temp.", f"{filtered_forecast['temp'].min():.2f} C")
+                st.metric("Max temp.", f"{filtered_forecast['temp'].max():.2f} C")
     with right_col:
-        if filtered_forecast.empty:
-            st.warning("Brak punktow dla wybranego czasu prognozy.")
-        else:
+        if filtered_forecast is not None:
             forecast_map = build_heatmap(filtered_forecast, "temp", "Temperatura prognozowana (C)")
             st_folium(forecast_map, width=None, height=630, key="forecast_map", returned_objects=[])
 
