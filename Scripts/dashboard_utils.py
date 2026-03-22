@@ -6,6 +6,7 @@ from pathlib import Path
 import folium
 import pandas as pd
 import streamlit as st
+from branca.element import Element
 from folium.plugins import HeatMap
 
 
@@ -47,6 +48,7 @@ def list_forecast_snapshots() -> list[tuple[pd.Timestamp, Path]]:
     return snapshots
 
 
+@st.cache_data(show_spinner=False)
 def load_forecast(path: Path) -> pd.DataFrame:
     raw = json.loads(path.read_text(encoding="utf-8"))
     rows: list[dict] = []
@@ -99,5 +101,26 @@ def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
             fill_opacity=0.6,
             popup=f"{title}: {row[value_col]:.2f}",
         ).add_to(fmap)
+
+    # Leaflet nie renderuje mapy poprawnie gdy kontener ma display:none (ukryty tab).
+    # ResizeObserver wywołuje invalidateSize() w momencie gdy kontener staje się widoczny.
+    fmap.get_root().html.add_child(Element("""
+    <script>
+    (function () {
+        var ro = new ResizeObserver(function (entries) {
+            for (var i = 0; i < entries.length; i++) {
+                if (entries[i].contentRect.width > 0) {
+                    document.querySelectorAll('.leaflet-container').forEach(function (el) {
+                        if (el._leaflet_map) el._leaflet_map.invalidateSize(true);
+                    });
+                    ro.disconnect();
+                    return;
+                }
+            }
+        });
+        ro.observe(document.body);
+    })();
+    </script>
+    """))
 
     return fmap

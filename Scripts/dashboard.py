@@ -55,7 +55,7 @@ def history_fragment():
             st.warning("Brak danych dla wybranego timestamp.")
         else:
             hist_map = build_heatmap(filtered_hist, selected_param, PARAM_LABELS[selected_param])
-            st_folium(hist_map, width=None, height=630, key="hist_map")
+            st_folium(hist_map, width=None, height=630, key="hist_map", returned_objects=[])
 
 
 @st.fragment
@@ -76,12 +76,17 @@ def forecast_fragment():
         )
         selected_snapshot_path = dict(snapshots)[selected_snapshot]
         forecast_df = load_forecast(selected_snapshot_path)
-        available_times = sorted(forecast_df["forecast_time"].unique())
+        available_times = sorted(
+            pd.to_datetime(forecast_df["forecast_time"].unique()).tolist()
+        )
+        # Gdy zmieni się snapshot, resetuj wybrany czas żeby uniknąć kaskady reruns
+        if st.session_state.get("_prev_forecast_snapshot") != selected_snapshot:
+            st.session_state["_prev_forecast_snapshot"] = selected_snapshot
+            st.session_state["forecast_time"] = available_times[0]
         selected_time = st.selectbox(
             "Czas prognozy",
             options=available_times,
             format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
-            index=0,
             key="forecast_time",
         )
         filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
@@ -98,7 +103,7 @@ def forecast_fragment():
             st.warning("Brak punktow dla wybranego czasu prognozy.")
         else:
             forecast_map = build_heatmap(filtered_forecast, "temp", "Temperatura prognozowana (C)")
-            st_folium(forecast_map, width=None, height=630, key="forecast_map")
+            st_folium(forecast_map, width=None, height=630, key="forecast_map", returned_objects=[])
 
 
 with tab_history:
