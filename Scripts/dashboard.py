@@ -20,8 +20,8 @@ from ai_risk import MatchedPoint, RiskAssessment, assess_risk
 st.set_page_config(page_title="Dashboard pogodowy Tatry", page_icon="", layout="wide")
 
 st.title("Dashboard pogodowy Tatry")
-tab_history, tab_forecast, tab_ai, tab_export = st.tabs(
-    ["Dane historyczne", "Prognoza pogody", "Ocena ryzyka AI", "Eksport danych"]
+tab_ai, tab_history, tab_forecast, tab_export = st.tabs(
+    ["Ocena ryzyka AI", "Dane historyczne", "Prognoza pogody", "Eksport danych"]
 )
 
 
