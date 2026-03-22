@@ -102,23 +102,25 @@ def build_heatmap(df: pd.DataFrame, value_col: str, title: str) -> folium.Map:
             popup=f"{title}: {row[value_col]:.2f}",
         ).add_to(fmap)
 
-    # Leaflet nie renderuje mapy poprawnie gdy kontener ma display:none (ukryty tab).
-    # ResizeObserver wywołuje invalidateSize() w momencie gdy kontener staje się widoczny.
+    # Leaflet nie zna swoich wymiarów gdy inicjalizuje się w ukrytym tabie (display:none).
+    # Sprawdzamy getSize().x === 0 — to pewny wskaźnik że mapa nie zna wymiarów.
+    # Wywołujemy invalidateSize() co 500ms dopóki mapa nie zna wymiarów lub minie 10s.
     fmap.get_root().html.add_child(Element("""
     <script>
     (function () {
-        var ro = new ResizeObserver(function (entries) {
-            for (var i = 0; i < entries.length; i++) {
-                if (entries[i].contentRect.width > 0) {
-                    document.querySelectorAll('.leaflet-container').forEach(function (el) {
-                        if (el._leaflet_map) el._leaflet_map.invalidateSize(true);
-                    });
-                    ro.disconnect();
-                    return;
+        var ticks = 0;
+        var interval = setInterval(function () {
+            ticks++;
+            document.querySelectorAll('.leaflet-container').forEach(function (el) {
+                if (el._leaflet_map) {
+                    var sz = el._leaflet_map.getSize();
+                    if (sz.x === 0 || sz.y === 0) {
+                        el._leaflet_map.invalidateSize(true);
+                    }
                 }
-            }
-        });
-        ro.observe(document.body);
+            });
+            if (ticks >= 20) clearInterval(interval);
+        }, 500);
     })();
     </script>
     """))

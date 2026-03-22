@@ -64,31 +64,37 @@ def forecast_fragment():
     if not snapshots:
         st.error("Brak plikow prognozy w katalogu data/json.")
         return
+
+    # Klucze jako stringi eliminują problem porównywania pd.Timestamp z session_state
+    snapshot_labels = [t.strftime("%Y-%m-%d %H:%M:%S") for t, _ in snapshots]
+    snapshot_path_map = {label: path for label, (_, path) in zip(snapshot_labels, snapshots)}
+
+    # Obsługuje zarówno brak klucza jak i przestarzałą wartość (np. pd.Timestamp po hot-reload)
+    if st.session_state.get("forecast_snapshot") not in snapshot_labels:
+        st.session_state["forecast_snapshot"] = snapshot_labels[-1]
+
     left_col, right_col = st.columns([1.5, 8.5], gap="medium")
     with left_col:
-        snapshot_times = [item[0] for item in snapshots]
-        selected_snapshot = st.selectbox(
+        selected_label = st.selectbox(
             "Pobrano",
-            options=snapshot_times,
-            format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
-            index=len(snapshot_times) - 1,
+            options=snapshot_labels,
             key="forecast_snapshot",
         )
-        selected_snapshot_path = dict(snapshots)[selected_snapshot]
-        forecast_df = load_forecast(selected_snapshot_path)
+        forecast_df = load_forecast(snapshot_path_map[selected_label])
         available_times = sorted(
             pd.to_datetime(forecast_df["forecast_time"].unique()).tolist()
         )
-        # Gdy zmieni się snapshot, resetuj wybrany czas żeby uniknąć kaskady reruns
-        if st.session_state.get("_prev_forecast_snapshot") != selected_snapshot:
-            st.session_state["_prev_forecast_snapshot"] = selected_snapshot
-            st.session_state["forecast_time"] = available_times[0]
-        selected_time = st.selectbox(
+        time_labels = [t.strftime("%Y-%m-%d %H:%M:%S") for t in available_times]
+        time_map = {label: t for label, t in zip(time_labels, available_times)}
+
+        if st.session_state.get("forecast_time") not in time_labels:
+            st.session_state["forecast_time"] = time_labels[0]
+        selected_time_label = st.selectbox(
             "Czas prognozy",
-            options=available_times,
-            format_func=lambda x: x.strftime("%Y-%m-%d %H:%M:%S"),
+            options=time_labels,
             key="forecast_time",
         )
+        selected_time = time_map[selected_time_label]
         filtered_forecast = forecast_df[forecast_df["forecast_time"] == selected_time].copy()
         if filtered_forecast.empty:
             st.warning("Brak danych.")
