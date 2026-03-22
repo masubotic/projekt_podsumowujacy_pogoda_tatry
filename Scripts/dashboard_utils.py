@@ -34,6 +34,17 @@ def latest_forecast_file() -> Path | None:
     return files[-1] if files else None
 
 
+def list_forecast_snapshots() -> list[tuple[pd.Timestamp, Path]]:
+    snapshots: list[tuple[pd.Timestamp, Path]] = []
+    for path in sorted(JSON_DIR.glob("*.json")):
+        try:
+            snapshot_time = pd.to_datetime(path.stem, format="%Y%m%d_%H%M%S")
+        except ValueError:
+            continue
+        snapshots.append((snapshot_time, path))
+    return snapshots
+
+
 def load_forecast(path: Path) -> pd.DataFrame:
     raw = json.loads(path.read_text(encoding="utf-8"))
     rows: list[dict] = []
