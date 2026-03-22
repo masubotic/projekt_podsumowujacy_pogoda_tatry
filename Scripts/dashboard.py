@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 from io import BytesIO
 import pandas as pd
+import plotly.graph_objects as go
 
 from dashboard_utils import (
     HISTORICAL_CSV,
@@ -136,42 +137,41 @@ def ai_risk_fragment():
         st.session_state["ai_snapshot"] = snapshot_labels[-1]
 
     left_col, right_col = st.columns([2.5, 7.5], gap="medium")
-    result: RiskAssessment | None = st.session_state.get("ai_result")
 
     with left_col:
         selected_label = st.selectbox("Pobrano", options=snapshot_labels, key="ai_snapshot")
         snapshot_path = snapshot_path_map[selected_label]
 
         st.markdown("##### Opisz lokalizację")
-        user_description = st.text_area(
+        user_description = st.text_input(
             label="Lokalizacja",
-            placeholder="np. okolice Kasprowego Wierchu, Morskie Oko, Dolina Kościeliska...",
-            height=100,
+            placeholder="np. okolice Kasprowego Wierchu, Morskie Oko...",
             label_visibility="collapsed",
             key="ai_description",
         )
 
-        if st.button("Oceń ryzyko", type="primary", use_container_width=True, disabled=not user_description):
+        # Trigger AI gdy opis zmienił się względem ostatniego zapytania
+        if user_description and user_description != st.session_state.get("_last_ai_description"):
+            st.session_state["_last_ai_description"] = user_description
             with st.spinner("Odpytuję AI..."):
                 try:
                     all_points = get_all_points_forecast_24h(snapshot_path)
                     result = assess_risk(all_points, user_description)
                     st.session_state["ai_result"] = result
-                    st.session_state["ai_result_snapshot"] = selected_label
                 except Exception as e:
                     st.session_state["ai_result"] = None
                     st.error(f"Błąd API: {e}")
+            st.rerun(scope="fragment")
 
-        result = st.session_state.get("ai_result")
+    result: RiskAssessment | None = st.session_state.get("ai_result")
+    all_points = get_all_points_forecast_24h(snapshot_path)
+
+    with right_col:
         if result is not None:
             rec = result.recommendation.lower()
             box_fn_name, risk_label = _RISK_COLORS.get(rec, ("info", rec))
-            box_fn = getattr(st, box_fn_name)
-            st.markdown("---")
-            box_fn(f"**{risk_label}**\n\n{result.justification}")
+            getattr(st, box_fn_name)(f"**{risk_label}**\n\n{result.justification}")
 
-    with right_col:
-        all_points = get_all_points_forecast_24h(snapshot_path)
         matched_lat = result.matched_lat if result else None
         matched_lon = result.matched_lon if result else None
 
@@ -179,7 +179,7 @@ def ai_risk_fragment():
 
         with map_col:
             ai_map = build_ai_map(all_points, matched_lat, matched_lon)
-            st_folium(ai_map, width=None, height=450, key="ai_map", returned_objects=[])
+            st_folium(ai_map, width=None, height=420, key="ai_map", returned_objects=[])
 
         with chart_col:
             if result is not None:
@@ -191,11 +191,20 @@ def ai_risk_fragment():
                 )
                 if matched_point:
                     st.markdown(f"##### Prognoza 24h — {result.matched_description}")
-                    chart_df = pd.DataFrame(
-                        {"Temperatura (°C)": list(matched_point["prognoza_24h"].values())},
-                        index=list(matched_point["prognoza_24h"].keys()),
+                    times = list(matched_point["prognoza_24h"].keys())
+                    temps = list(matched_point["prognoza_24h"].values())
+                    tick_labels = [t[:16] for t in times]  # usuwa sekundy
+                    fig = go.Figure(go.Scatter(
+                        x=tick_labels, y=temps, mode="lines+markers",
+                        line=dict(color="#2563eb"), marker=dict(size=6),
+                    ))
+                    fig.update_layout(
+                        xaxis=dict(tickangle=45),
+                        yaxis_title="Temperatura (°C)",
+                        margin=dict(t=10, b=10, l=10, r=10),
+                        height=380,
                     )
-                    st.line_chart(chart_df, y="Temperatura (°C)")
+                    st.plotly_chart(fig, use_container_width=True)
 
 
 with tab_history:
