@@ -2315,6 +2315,13 @@ date,avg_temp,min_temp,max_temp,precipitation_total_mm,snow,wind_direction,avera
 2026-05-02 00:00:00,,,,,,,,,,,Zakopane
 2026-05-03 00:00:00,,,,,,,,,,,Zakopane
 2026-05-04 00:00:00,,,,,,,,,,,Zakopane
+2026-05-05 00:00:00,,,,,,,,,,,Zakopane
+2026-05-06 00:00:00,,,,,,,,,,,Zakopane
+2026-05-07 00:00:00,,,,,,,,,,,Zakopane
+2026-05-08 00:00:00,,,,,,,,,,,Zakopane
+2026-05-09 00:00:00,,,,,,,,,,,Zakopane
+2026-05-10 00:00:00,,,,,,,,,,,Zakopane
+2026-05-11 00:00:00,,,,,,,,,,,Zakopane
 2020-01-01 00:00:00,-8.3,-10.3,-5.0,,,,28.4,,,,Kasprowy Wierch
 2020-01-02 00:00:00,-0.2,-4.7,4.6,,,,26.2,,,,Kasprowy Wierch
 2020-01-03 00:00:00,1.7,-1.8,5.3,,,,34.6,,,,Kasprowy Wierch
@@ -4631,3 +4638,10 @@ date,avg_temp,min_temp,max_temp,precipitation_total_mm,snow,wind_direction,avera
 2026-05-02 00:00:00,2.7,-1.9,8.5,0.0,,,8.6,,1024.7,,Kasprowy Wierch
 2026-05-03 00:00:00,,,,,,,,,,,Kasprowy Wierch
 2026-05-04 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-05 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-06 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-07 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-08 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-09 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-10 00:00:00,,,,,,,,,,,Kasprowy Wierch
+2026-05-11 00:00:00,,,,,,,,,,,Kasprowy Wierch
